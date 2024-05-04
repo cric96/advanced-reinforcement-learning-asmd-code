@@ -1,16 +1,6 @@
 ThisBuild / version := "0.1.0-SNAPSHOT"
 
-
-// Properties for the Python interpreter
-initialize ~= { _ =>
-  val result = java.lang.Runtime.getRuntime.exec(Array("python", "--version"))
-  result.waitFor()
-  val line = scala.io.Source.fromInputStream(result.getInputStream).getLines().next()
-  val version = line.split(" ")(1)
-  val majorAndMinor = version.split('.').take(2).mkString(".")
-  System.setProperty("scalapy.python.programname", "env/bin/python")
-  System.setProperty("scalapy.python.library", s"python$majorAndMinor")
-}
+ThisBuild / scalaVersion := "3.3.3"
 
 lazy val root = (project in file("."))
   .settings(
@@ -23,3 +13,11 @@ lazy val root = (project in file("."))
       "org.scalatest" %% "scalatest" % "3.2.14" % "test",
     ),
   )
+
+fork := true
+import ai.kien.python.Python
+lazy val python = Python()
+lazy val javaOpts = python.scalapyProperties.get.map {
+  case (k, v) => s"""-D$k=$v"""
+}.toSeq
+javaOptions ++= javaOpts
