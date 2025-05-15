@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: [windows-latest, ubuntu-latest]
+    runs-on: ubuntu-latest
     steps:
     ### For scala
     - uses: actions/checkout@v3
