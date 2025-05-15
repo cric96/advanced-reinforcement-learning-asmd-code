@@ -43,7 +43,7 @@ object Action:
   val memory: ReplayBuffer[py.Dynamic, Action] = ReplayBuffer.bounded(100000)
   val decay: DecayReference[Double] = DecayReference.exponentialDecay(0.9, 0.01).bounded(0.05)
   val agent =
-    DeepQAgent(memory, decay, gamma = 0.99, learningRate = 0.0005, hiddenSize = 128, batchSize = 128, updateEach = 1000)
+    DeepQAgent(memory, decay, gamma = 0.99, learningRate = 0.0005, hiddenSize = 64, batchSize = 64, updateEach = 1000)
   agent.trainingMode()
   (0 to episodes).foreach: _ =>
     var episodeReward = 0.0
@@ -57,7 +57,7 @@ object Action:
       agent.record(observationOld, action, reward, observation, done)
       if done then
         println(s"Episode finished after $episodeReward timesteps")
-        println("EPSILON" + decay)
+        println("EPSILON: " + decay)
         val (observationNew, _) = environment.reset().as[ResetReturn]
         observation = observationNew
       scheduler.tickStep()
@@ -72,5 +72,6 @@ object Action:
   while !done do
     val action = agent.optimal(observation)
     val (observationNew, reward, doneCurrent, truncated, info) = testEnv.step(action.value).as[StepReturn]
+    Thread.sleep(100)
     done = doneCurrent || truncated
     observation = observationNew
