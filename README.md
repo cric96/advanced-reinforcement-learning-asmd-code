@@ -124,11 +124,19 @@ In this repository, I demonstrate two examples using the general structure outli
 
 
 ### Exercises
-After running the examples, try to extend the codebase with one of the following exercise:
-- try to incorporate [Petting Zoo](https://pettingzoo.farama.org/index.html) environments into the simulation and verify the results using Deep Q learning (shared, independent, centralised)
-- try to create another environment that simulate a flock of drones that need to stay connected. Try to:
-  - understand how can you create the right reward function to create a flock (cohesion + separation)
-  - discretize the action space (i.e., 8 directions)
-  - understand the right observation space (i.e., the position of the drones? The position of the N nearest drones?)
-  - implement the environment and the agents
-  - verify if the agents are able to learn the right policy, i.e., stay connected and create a flock
+
+After running the examples, try extending the codebase with one of the following exercises:
+
+**Exercise 1: PettingZoo Integration**
+- Incorporate [PettingZoo](https://pettingzoo.farama.org/index.html) environments into the simulation and verify the results using Deep Q-Learning with different training approaches (shared, independent, and centralized).
+
+**Exercise 2: Drone Flocking Simulation**
+- Create a custom environment that simulates a flock of drones that need to maintain connectivity. Consider the following aspects:
+  - **Reward Function Design**: Develop an appropriate reward function that encourages flocking behavior by balancing cohesion (staying together) and separation (avoiding collisions).
+  - **Action Space**: Discretise the action space into manageable options (e.g., 8 directional movements).
+  - **Observation Space**: Define the optimal observation space for each drone. Consider options such as:
+    - Absolute position of all drones
+    - Relative positions of the N nearest neighboring drones
+    - Local density and directional information
+  - **Implementation**: Build both the environment and the agent implementations.
+  - **Validation**: Verify that the agents successfully learn the desired policy to maintain connectivity and exhibit emergent flocking behavior.
