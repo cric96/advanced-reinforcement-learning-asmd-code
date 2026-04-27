@@ -3,8 +3,6 @@ package it.unibo.examples.cooperative
 import cats.{Eval, Reducible}
 import cats.Reducible
 import it.unibo.model.core.abstractions.Enumerable.*
-import me.shadaj.scalapy.interpreter.CPythonInterpreter
-import me.shadaj.scalapy.py
 import scala.util.Random
 import cats.implicits.*
 import it.unibo.examples.Simulation
@@ -12,20 +10,9 @@ import it.unibo.model.core.abstractions.{AI, DecayReference, Enumerable, Q, Sche
 import it.unibo.model.core.learning.{DeepQAgent, QAgent, ReplayBuffer}
 import it.unibo.model.core.network.NeuralNetworkEncoding
 import it.unibo.view.Render
-import scala.util.Properties
 object BoundedWorldTest:
   import BoundedWorldEnvironment.*
-  // Debug
-  /// Python program name
-  println(Properties.propOrNone("scalapy.python.programname"))
-  println(Properties.propOrNone("scalapy.python.library"))
 
-  val sys = py.module("sys")
-  println(sys.executable)
-  println(sys.version)
-  CPythonInterpreter.eval("import torch")
-
-  // Constants
   val agents = 2
   val boundSize = 5
   val trainingEpisodes = 1000

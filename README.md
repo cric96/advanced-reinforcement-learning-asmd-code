@@ -11,24 +11,21 @@ Also, consider to read the following book: https://www.marl-book.com/
 If you have any questions, please feel free to contact me at gianluca[dot]aguzzi[at]unibo[dot]it
 
 ## Installation
-To install the project, you need to have sbt installed on your machine and python >= 3.8
-Firs of all, after cloning the repository, you need to create a virtual environment and install the requirements:
-```shell
-python3 -m venv env
-source env/bin/activate
-```
-Now, you can install the requirements:
-```shell
-pip install -r requirements.txt
-```
+To install the project, you need to have sbt installed on your machine. No Python required - this is pure Scala!
 
-To run the project, you need to compile the scala code and then run the python code:
+After cloning the repository, simply compile and run:
 ```shell
 sbt compile
 sbt run
 ```
 
-If everything is ok, typying 13 you should see the GYM example shown in class.
+If everything is ok, typing 13 you should see the CartPole example shown in class.
+
+## Dependencies
+- **Scala 3.3.3**
+- **Smile 6.0.1** - Machine learning and deep learning library (native JVM, no Python interop)
+- **Cats 2.9.0** - Functional programming utilities
+
 ## Structure
 ```mermaid
 classDiagram
@@ -122,13 +119,15 @@ In this repository, I demonstrate two examples using the general structure outli
 
 - **Cooperative Task, Agent Alignment**: Here, `N` agents aim to align themselves either in a row or a column. This setup is inherently cooperative, as agents must work together to achieve the correct positioning. I discuss several common frameworks in cooperative tasks, including independent learners, team learning with a shared Q-table, and centralized learning. This serves as an introduction to "infinite" agent learning.
 
+- **CartPole Environment**: A custom pure Scala implementation of the classic CartPole-v1 environment, demonstrating Deep Q-Learning without any Python dependencies.
+
 
 ### Exercises
 
 After running the examples, try extending the codebase with one of the following exercises:
 
-**Exercise 1: PettingZoo Integration**
-- Incorporate [PettingZoo](https://pettingzoo.farama.org/index.html) environments into the simulation and verify the results using Deep Q-Learning with different training approaches (shared, independent, and centralized).
+**Exercise 1: Custom Environment Integration**
+- Create a custom environment in pure Scala and verify the results using Deep Q-Learning with different training approaches (shared, independent, and centralized).
 
 **Exercise 2: Drone Flocking Simulation**
 - Create a custom environment that simulates a flock of drones that need to maintain connectivity. Consider the following aspects:

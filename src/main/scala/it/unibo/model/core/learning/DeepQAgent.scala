@@ -1,14 +1,14 @@
 package it.unibo.model.core.learning
 
-import it.unibo.model.core.network.NeuralNetworkEncoding
+import it.unibo.model.core.network.{DQN, NeuralNetworkEncoding}
 import it.unibo.model.core.abstractions.{AI, DecayReference, Enumerable, Scheduler}
 import it.unibo.model.core.learning.Learner
-import me.shadaj.scalapy.py
-import me.shadaj.scalapy.py.SeqConverters
-import me.shadaj.scalapy.py.PyQuote
-import it.unibo.model.core.network.*
+import smile.deep.tensor.Tensor
+import smile.deep.Optimizer
+import smile.deep.Loss
 
 import scala.util.Random
+import scala.util.Using
 import it.unibo.model.core.abstractions.DecayReference.*
 
 class DeepQAgent[State, Action: Enumerable](
@@ -23,9 +23,10 @@ class DeepQAgent[State, Action: Enumerable](
     extends AI.Agent[State, Action]
     with Learner[State, Action]:
   self =>
-  private val targetNetwork = DQN(stateEncoding.elements, hiddenSize, Enumerable[Action].size)
-  private val policyNetwork = DQN(stateEncoding.elements, hiddenSize, Enumerable[Action].size)
-  private val writer = log.SummaryWriter()
+  private val nActions = Enumerable[Action].size
+  private val stateSize = stateEncoding.elements
+  private val targetNetwork = DQN(stateSize, hiddenSize, nActions)
+  private val policyNetwork = DQN(stateSize, hiddenSize, nActions)
 
   def slave(): AI.Agent[State, Action] with Learner[State, Action] =
     new AI.Agent[State, Action] with Learner[State, Action]:
@@ -34,52 +35,75 @@ class DeepQAgent[State, Action: Enumerable](
       val behavioural = self.behavioural
       val optimal = self.optimal
 
-  private val optimizer = optim.Adam(policyNetwork.parameters(), learningRate.value)
+  private val smileOptimizer = Optimizer.SGD(policyNetwork.asModel(), learningRate.value)
+  private val criterion = Loss.mse()
 
   val behavioural: State => Action = state =>
-    if random.nextDouble() < epsilon then random.shuffle(Enumerable[Action]).head
+    if random.nextDouble() < epsilon.value then random.shuffle(Enumerable[Action]).head
     else actionFromNet(state, policyNetwork)
 
   val optimal: State => Action = state => actionFromNet(state, targetNetwork)
 
   override def improve(state: State, action: Action, reward: Double, nextState: State, done: Boolean): Unit =
-    memory.insert(state, action, reward, nextState, done) // record the current experience in the replay buffer
-    val memorySample = memory.sample(batchSize) // sample from the experience to improve the policy network
-    if (memory.sample(batchSize).size == batchSize) // wait to have enough samples
-      // get S_t, A_t, R_t+1 from the buffer
-      // Shape: [buffer_size, state_size]
-      val states = memorySample.map(_.state).toSeq.map(state => stateEncoding.toSeq(state).toPythonCopy).toPythonCopy
-      // Shape: [buffer_size, action_size]
-      val action = memorySample.map(_.action).toSeq.map(action => Enumerable[Action].indexOf(action)).toPythonCopy
-      // Shape: [buffer_size, 1]
-      val rewards = torch.tensor(memorySample.map(_.reward).toSeq.toPythonCopy)
-      // Normalize the rewards to avoid explosion gradient
-      val nextState =
-        memorySample.map(_.nextState).toSeq.map(state => stateEncoding.toSeq(state).toPythonCopy).toPythonCopy
-      // Compute the next action, here will be perform the gradient descent
-      val stateActionValue = policyNetwork(torch.tensor(states)).gather(1, torch.tensor(action).view(batchSize, 1))
-      // Get an approximation of max_Q(s_t, a_t) using the target network
-      val mask = torch.tensor(memorySample.map(_.done).toSeq.map(done => if done then 0 else 1).toPythonCopy)
-      val nextStateValuesZeros = torch.zeros(batchSize, 1)
-      val nextStateValues = py.`with`(torch.no_grad()): _ =>
-        targetNetwork(torch.tensor(nextState)).max(1).bracketAccess(0).detach() * mask
+    memory.insert(state, action, reward, nextState, done)
+    val memorySample = memory.sample(batchSize)
+    if memorySample.size == batchSize then
+      val states = encodeStates(memorySample.map(_.state).toSeq)
+      val actionIndices = memorySample.map(_.action).toSeq.map(Enumerable[Action].indexOf).toArray
+      val rewards = memorySample.map(_.reward).map(_.toFloat).toArray
+      val nextStates = encodeStates(memorySample.map(_.nextState).toSeq)
+      val dones = memorySample.map(_.done).map(d => if d then 0f else 1f).toArray
 
-      // Compute the usual expected value
-      val expectedValue = (nextStateValues * gamma) + rewards
-      // Simular to MSE, but with L1 regularization
-      val criterion = nn.MSELoss()
-      val loss = criterion(stateActionValue, expectedValue.unsqueeze(1))
-      writer.add_scalar("Loss", loss, scheduler.totalTicks)
-      optimizer.zero_grad() // clear old gradient
-      loss.backward() // compute new gradient
-      py"[param.grad.data.clamp_(-1, 1) for param in ${policyNetwork.parameters()}]" // clip the gradient, avoid overfitting and exploding gradient
-      optimizer.step() // improve the newtwork
-      // each updateEach, update the target network (moving target...)
-      if scheduler.totalTicks % updateEach == 0 then targetNetwork.load_state_dict(policyNetwork.state_dict())
+      Using.Manager { use =>
+        val statesTensor = use(Tensor.of(states).reshape(batchSize, stateSize))
+        val actionsTensor = use(Tensor.of(actionIndices.map(_.toLong)).reshape(batchSize, 1))
+        val rewardsTensor = use(Tensor.of(rewards))
+        val nextStatesTensor = use(Tensor.of(nextStates).reshape(batchSize, stateSize))
+        val maskTensor = use(Tensor.of(dones).reshape(batchSize, 1))
 
-  private def actionFromNet(state: State, network: py.Dynamic): Action =
-    val netInput = stateEncoding.toSeq(state)
-    py.`with`(torch.no_grad()): _ =>
-      val tensor = torch.tensor(netInput.toPythonCopy).view(1, stateEncoding.elements)
-      val actionIndex = network(tensor).max(1).bracketAccess(1).item().as[Int]
+        val stateActionValue = use(policyNetwork.forward(statesTensor).gather(1, actionsTensor))
+
+        val guard = Tensor.noGradGuard()
+        val nextStateValues = use {
+          try
+            val nextQValues = targetNetwork.forward(nextStatesTensor)
+            val bestActionIndices = nextQValues.argmax(1, false)
+            nextQValues.gather(1, bestActionIndices.reshape(batchSize, 1)).mul(maskTensor)
+          finally guard.close()
+        }
+
+        val expectedValue = use(nextStateValues.mul(gamma).add(rewardsTensor.reshape(batchSize, 1)))
+        val loss = use(criterion.apply(stateActionValue, expectedValue))
+
+        smileOptimizer.reset()
+        loss.backward()
+        smileOptimizer.step()
+
+        if scheduler.totalTicks % updateEach == 0 then
+          copyWeights(policyNetwork, targetNetwork)
+      }.failed.foreach(throw _)
+
+  private def encodeStates(states: Seq[State]): Array[Float] =
+    states.flatMap(state => stateEncoding.toSeq(state).map(_.toFloat)).toArray
+
+  private def copyWeights(from: DQN, to: DQN): Unit =
+    val fromParams = from.asTorch().parameters()
+    val toParams = to.asTorch().parameters()
+    (0L until fromParams.size()).foreach { i =>
+      Using(fromParams.get(i).data().clone()) { fromData =>
+        toParams.get(i).data().copy_(fromData)
+      }
+    }
+
+  private def actionFromNet(state: State, network: DQN): Action =
+    val encoded = stateEncoding.toSeq(state).map(_.toFloat).toArray
+    Using.Manager { use =>
+      val inputTensor = use(Tensor.of(encoded).reshape(1, stateSize))
+      val guard = Tensor.noGradGuard()
+      val outputTensor = use {
+        try network.forward(inputTensor)
+        finally guard.close()
+      }
+      val actionIndex = outputTensor.argmax(1, false).intValue()
       Enumerable[Action].toList(actionIndex)
+    }.get

@@ -8,16 +8,17 @@ lazy val root = (project in file("."))
     name := "multi-agent-system-modelling",
     libraryDependencies ++= Seq(
       "org.typelevel" %% "cats-core" % "2.9.0",
-      "dev.scalapy" %% "scalapy-core" % "0.5.3",
+      "com.github.haifengl" %% "smile-scala" % "6.0.1",
+      "com.github.haifengl"  % "smile-deep"  % "6.0.1",
       "org.scalactic" %% "scalactic" % "3.2.14",
       "org.scalatest" %% "scalatest" % "3.2.14" % "test",
     ),
   )
 
 fork := true
-import ai.kien.python.Python
-lazy val python = Python()
-lazy val javaOpts = python.scalapyProperties.get.map {
-  case (k, v) => s"""-D$k=$v"""
-}.toSeq
-javaOptions ++= javaOpts
+javaHome := Some(file("/usr/lib/jvm/java-25-openjdk"))
+javaOptions ++= Seq(
+  "-Xmx4G",
+  "-Djava.library.path=/usr/lib/x86_64-linux-gnu",
+  "--enable-native-access=ALL-UNNAMED"
+)

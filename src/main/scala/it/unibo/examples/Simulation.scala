@@ -4,7 +4,6 @@ import it.unibo.model.core.abstractions.{AI, MultiAgentEnvironment, Scheduler}
 import cats.{Align, Applicative, Foldable}
 import cats.syntax.align.{*, given}
 import cats.implicits.*
-import it.unibo.model.core.network.log
 import it.unibo.view.Render
 
 class Simulation[State, Action](using scheduler: Scheduler)(
@@ -12,7 +11,6 @@ class Simulation[State, Action](using scheduler: Scheduler)(
     renderer: Render[State] = Render.empty[State]
 ):
   import environment.*
-  private val writer = log.SummaryWriter()
   def simulate(episodes: Int, episodeLength: Int, agents: Seq[AI.Agent[State, Action]]): Unit =
     scheduler.reset()
     for episode <- 0 to episodes do
@@ -32,7 +30,6 @@ class Simulation[State, Action](using scheduler: Scheduler)(
         }
         scheduler.tickStep()
       scheduler.tickEpisode()
-      writer.add_scalar(s"Reward", totalRewards.sumAll, scheduler.episode)
       println(s"Episode $episode, statistics: $totalRewards")
 
   def simulateCentralController(
@@ -56,5 +53,4 @@ class Simulation[State, Action](using scheduler: Scheduler)(
         agent.record(state, actions, rewards.sumAll, nextState)
         scheduler.tickStep()
       scheduler.tickEpisode()
-      writer.add_scalar(s"Reward", totalRewards.sumAll, scheduler.episode)
       println(s"Episode $episode, statistics: $totalRewards")

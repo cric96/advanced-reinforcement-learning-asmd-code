@@ -52,7 +52,7 @@ object Scheduler:
 
     override def attachListener(listener: SchedulerListener): Unit = listeners = listener :: listeners
 
-  /** Listener used to been notified about episode and step changes */
+  /** Listener used to be notified about episode and step changes */
   sealed trait SchedulerListener:
     def onStep(step: Int): Unit = {}
     def onEpisode(step: Int): Unit = {}
