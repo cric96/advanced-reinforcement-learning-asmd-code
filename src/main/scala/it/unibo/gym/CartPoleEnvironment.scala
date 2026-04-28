@@ -4,12 +4,50 @@ import scala.util.Random
 import it.unibo.model.core.network.NeuralNetworkEncoding
 import it.unibo.model.core.abstractions.Enumerable
 
-private object CartPoleConstants:
-  val UniformRodInertiaFactor = 4.0 / 3.0
-  val InitNoiseRange = 0.1
-  val InitNoiseOffset = 0.05
-  val RewardOnStep = 1.0
-  val RewardOnFailure = 0.0
+class CartPoleEnvironment(config: CartPoleConfig)(using random: Random):
+  import CartPoleConstants.{RewardOnStep, RewardOnFailure}
+
+  private val totalMass = config.massCart + config.massPole
+  private val poleMassLength = config.massPole * config.length
+
+  private var state: CartPoleState = CartPoleState.zero
+  private var done: Boolean = false
+  private var stepCount: Int = 0
+
+  def reset(): CartPoleState =
+    state = CartPoleState.randomInit
+    done = false
+    stepCount = 0
+    state
+
+  def step(action: CartPoleAction): StepResult =
+    if done then return StepResult(state, RewardOnFailure, true)
+
+    val force = CartPoleAction.force(action, config.forceMag)
+    val newState = state.applyForce(
+      force = force,
+      gravity = config.gravity,
+      totalMass = totalMass,
+      poleMassLength = poleMassLength,
+      length = config.length,
+      tau = config.tau
+    )
+
+    state = newState
+    stepCount += 1
+
+    val isDone = state.isTerminal(config.xThreshold, config.thetaThresholdRadians, stepCount, config.maxSteps)
+    done = isDone
+    val reward = if isDone then RewardOnFailure else RewardOnStep
+
+    StepResult(state, reward, isDone)
+
+  def currentState: CartPoleState = state
+  def isDone: Boolean = done
+
+object CartPoleEnvironment:
+  def apply(config: CartPoleConfig = CartPoleConfig.Default)(using random: Random): CartPoleEnvironment =
+    new CartPoleEnvironment(config)
 
 case class CartPoleState(
     position: Double,
@@ -19,7 +57,14 @@ case class CartPoleState(
 ):
   import CartPoleConstants.UniformRodInertiaFactor
 
-  def applyForce(force: Double, gravity: Double, totalMass: Double, poleMassLength: Double, length: Double, tau: Double): CartPoleState =
+  def applyForce(
+      force: Double,
+      gravity: Double,
+      totalMass: Double,
+      poleMassLength: Double,
+      length: Double,
+      tau: Double
+  ): CartPoleState =
     val costheta = math.cos(angle)
     val sintheta = math.sin(angle)
 
@@ -93,47 +138,9 @@ object CartPoleConfig:
     maxSteps = 500
   )
 
-object CartPoleEnvironment:
-  def apply(config: CartPoleConfig = CartPoleConfig.Default)(using random: Random): CartPoleEnvironment =
-    new CartPoleEnvironment(config)
-
-class CartPoleEnvironment(config: CartPoleConfig)(using random: Random):
-  import CartPoleConstants.{RewardOnStep, RewardOnFailure}
-
-  private val totalMass = config.massCart + config.massPole
-  private val poleMassLength = config.massPole * config.length
-
-  private var state: CartPoleState = CartPoleState.zero
-  private var done: Boolean = false
-  private var stepCount: Int = 0
-
-  def reset(): CartPoleState =
-    state = CartPoleState.randomInit
-    done = false
-    stepCount = 0
-    state
-
-  def step(action: CartPoleAction): StepResult =
-    if done then return StepResult(state, RewardOnFailure, true)
-
-    val force = CartPoleAction.force(action, config.forceMag)
-    val newState = state.applyForce(
-      force = force,
-      gravity = config.gravity,
-      totalMass = totalMass,
-      poleMassLength = poleMassLength,
-      length = config.length,
-      tau = config.tau
-    )
-
-    state = newState
-    stepCount += 1
-
-    val isDone = state.isTerminal(config.xThreshold, config.thetaThresholdRadians, stepCount, config.maxSteps)
-    done = isDone
-    val reward = if isDone then RewardOnFailure else RewardOnStep
-
-    StepResult(state, reward, isDone)
-
-  def currentState: CartPoleState = state
-  def isDone: Boolean = done
+private object CartPoleConstants:
+  val UniformRodInertiaFactor = 4.0 / 3.0
+  val InitNoiseRange = 0.1
+  val InitNoiseOffset = 0.05
+  val RewardOnStep = 1.0
+  val RewardOnFailure = 0.0

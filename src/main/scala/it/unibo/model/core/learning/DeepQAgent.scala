@@ -54,34 +54,36 @@ class DeepQAgent[State, Action: Enumerable](
       val nextStates = encodeStates(memorySample.map(_.nextState).toSeq)
       val dones = memorySample.map(_.done).map(d => if d then 0f else 1f).toArray
 
-      Using.Manager { use =>
-        val statesTensor = use(Tensor.of(states).reshape(batchSize, stateSize))
-        val actionsTensor = use(Tensor.of(actionIndices.map(_.toLong)).reshape(batchSize, 1))
-        val rewardsTensor = use(Tensor.of(rewards))
-        val nextStatesTensor = use(Tensor.of(nextStates).reshape(batchSize, stateSize))
-        val maskTensor = use(Tensor.of(dones).reshape(batchSize, 1))
+      Using
+        .Manager { use =>
+          val statesTensor = use(Tensor.of(states).reshape(batchSize, stateSize))
+          val actionsTensor = use(Tensor.of(actionIndices.map(_.toLong)).reshape(batchSize, 1))
+          val rewardsTensor = use(Tensor.of(rewards))
+          val nextStatesTensor = use(Tensor.of(nextStates).reshape(batchSize, stateSize))
+          val maskTensor = use(Tensor.of(dones).reshape(batchSize, 1))
 
-        val stateActionValue = use(policyNetwork.forward(statesTensor).gather(1, actionsTensor))
+          val stateActionValue = use(policyNetwork.forward(statesTensor).gather(1, actionsTensor))
 
-        val guard = Tensor.noGradGuard()
-        val nextStateValues = use {
-          try
-            val nextQValues = targetNetwork.forward(nextStatesTensor)
-            val bestActionIndices = nextQValues.argmax(1, false)
-            nextQValues.gather(1, bestActionIndices.reshape(batchSize, 1)).mul(maskTensor)
-          finally guard.close()
+          val guard = Tensor.noGradGuard()
+          val nextStateValues = use {
+            try
+              val nextQValues = targetNetwork.forward(nextStatesTensor)
+              val bestActionIndices = nextQValues.argmax(1, false)
+              nextQValues.gather(1, bestActionIndices.reshape(batchSize, 1)).mul(maskTensor)
+            finally guard.close()
+          }
+
+          val expectedValue = use(nextStateValues.mul(gamma).add(rewardsTensor.reshape(batchSize, 1)))
+          val loss = use(criterion.apply(stateActionValue, expectedValue))
+
+          smileOptimizer.reset()
+          loss.backward()
+          smileOptimizer.step()
+
+          if scheduler.totalTicks % updateEach == 0 then copyWeights(policyNetwork, targetNetwork)
         }
-
-        val expectedValue = use(nextStateValues.mul(gamma).add(rewardsTensor.reshape(batchSize, 1)))
-        val loss = use(criterion.apply(stateActionValue, expectedValue))
-
-        smileOptimizer.reset()
-        loss.backward()
-        smileOptimizer.step()
-
-        if scheduler.totalTicks % updateEach == 0 then
-          copyWeights(policyNetwork, targetNetwork)
-      }.failed.foreach(throw _)
+        .failed
+        .foreach(throw _)
 
   private def encodeStates(states: Seq[State]): Array[Float] =
     states.flatMap(state => stateEncoding.toSeq(state).map(_.toFloat)).toArray

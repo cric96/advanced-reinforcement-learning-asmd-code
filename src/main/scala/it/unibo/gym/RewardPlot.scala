@@ -4,48 +4,6 @@ import java.awt.Color
 import javax.swing.{JFrame, WindowConstants}
 import smile.plot.swing.{Canvas, Figure, Legend, Line, LinePlot, Point, ScatterPlot}
 
-case class PlotStyleColors(
-    scatterColor: Color = Color.BLUE,
-    movingAverageColor: Color = Color.RED,
-    thresholdColor: Color = Color.GREEN
-)
-
-case class PlotStyleLabels(
-    scatterLegend: String = "Episode Reward",
-    movingAverageLegend: String = "Moving Average",
-    thresholdFormat: String = "Threshold (%.1f)"
-)
-
-case class PlotStyle(
-    scatterPointChar: Char = '.',
-    colors: PlotStyleColors = PlotStyleColors(),
-    labels: PlotStyleLabels = PlotStyleLabels()
-)
-
-case class PlotAxisConfig(
-    xLabel: String = "Episode",
-    yLabel: String = "Reward",
-    title: String = "Episode Reward Over Time"
-)
-
-case class PlotWindowConfig(
-    title: String = "Training Rewards",
-    size: (Int, Int) = (820, 520)
-)
-
-case class RewardPlotConfig(
-    windowSize: Int = 20,
-    threshold: Double = 200.0,
-    upperBoundMargin: Double = 1.15,
-    minUpperBound: Double = 1.0,
-    axis: PlotAxisConfig = PlotAxisConfig(),
-    window: PlotWindowConfig = PlotWindowConfig(),
-    style: PlotStyle = PlotStyle()
-)
-
-object RewardPlotConfig:
-  val Default: RewardPlotConfig = RewardPlotConfig()
-
 class RewardPlot(config: RewardPlotConfig = RewardPlotConfig.Default):
 
   def show(rewards: List[Double]): Unit =
@@ -111,3 +69,45 @@ class RewardPlot(config: RewardPlotConfig = RewardPlotConfig.Default):
 object RewardPlot:
   def apply(config: RewardPlotConfig = RewardPlotConfig.Default): RewardPlot =
     new RewardPlot(config)
+
+object RewardPlotConfig:
+  val Default: RewardPlotConfig = RewardPlotConfig()
+
+case class PlotStyleColors(
+    scatterColor: Color = Color.BLUE,
+    movingAverageColor: Color = Color.RED,
+    thresholdColor: Color = Color.GREEN
+)
+
+case class PlotStyleLabels(
+    scatterLegend: String = "Episode Reward",
+    movingAverageLegend: String = "Moving Average",
+    thresholdFormat: String = "Threshold (%.1f)"
+)
+
+case class PlotStyle(
+    scatterPointChar: Char = '.',
+    colors: PlotStyleColors = PlotStyleColors(),
+    labels: PlotStyleLabels = PlotStyleLabels()
+)
+
+case class PlotAxisConfig(
+    xLabel: String = "Episode",
+    yLabel: String = "Reward",
+    title: String = "Episode Reward Over Time"
+)
+
+case class PlotWindowConfig(
+    title: String = "Training Rewards",
+    size: (Int, Int) = (820, 520)
+)
+
+case class RewardPlotConfig(
+    windowSize: Int = 20,
+    threshold: Double = 200.0,
+    upperBoundMargin: Double = 1.15,
+    minUpperBound: Double = 1.0,
+    axis: PlotAxisConfig = PlotAxisConfig(),
+    window: PlotWindowConfig = PlotWindowConfig(),
+    style: PlotStyle = PlotStyle()
+)

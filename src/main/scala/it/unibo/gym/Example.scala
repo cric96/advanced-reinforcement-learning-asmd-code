@@ -5,42 +5,6 @@ import it.unibo.model.core.learning.{DeepQAgent, ReplayBuffer}
 
 import scala.util.Random
 
-case class EpsilonDecayConfig(start: Double = 0.9, end: Double = 0.01, min: Double = 0.05)
-
-case class AgentConfig(
-    gamma: Double = 0.99,
-    learningRate: Double = 0.0005,
-    hiddenSize: Int = 64,
-    batchSize: Int = 64,
-    updateEach: Int = 1000,
-    memorySize: Int = 100000,
-    epsilonDecay: EpsilonDecayConfig = EpsilonDecayConfig()
-)
-
-case class TrainingConfig(
-    maxEpisodes: Int = 1500,
-    episodeMaxLength: Int = 200,
-    solveWindow: Int = 20,
-    solveThreshold: Double = 200.0,
-    logInterval: Int = 50
-)
-
-case class RenderConfig(
-    renderEach: Int = 200,
-    renderDelayMs: Long = 50L,
-    testDisplayDurationMs: Long = 2000L
-)
-
-case class ExperimentConfig(
-    training: TrainingConfig = TrainingConfig(),
-    agent: AgentConfig = AgentConfig(),
-    render: RenderConfig = RenderConfig(),
-    randomSeed: Long = 42
-)
-
-object ExperimentConfig:
-  val Default: ExperimentConfig = ExperimentConfig()
-
 @main def main(): Unit =
   val config = ExperimentConfig.Default
 
@@ -51,7 +15,8 @@ object ExperimentConfig:
   var observationOld = environment.reset()
   val memory: ReplayBuffer[CartPoleState, CartPoleAction] = ReplayBuffer.bounded(config.agent.memorySize)
   val decay: DecayReference[Double] =
-    DecayReference.exponentialDecay(config.agent.epsilonDecay.start, config.agent.epsilonDecay.end)
+    DecayReference
+      .exponentialDecay(config.agent.epsilonDecay.start, config.agent.epsilonDecay.end)
       .bounded(config.agent.epsilonDecay.min)
   val agent = DeepQAgent(
     memory,
@@ -92,10 +57,13 @@ object ExperimentConfig:
     episodeCount += 1
 
     val recentRewards = episodeRewards.takeRight(config.training.solveWindow)
-    if episodeRewards.size >= config.training.solveWindow && recentRewards.forall(_ >= config.training.solveThreshold) then
+    if episodeRewards.size >= config.training.solveWindow && recentRewards.forall(_ >= config.training.solveThreshold)
+    then
       solved = true
       val avg = f"${recentRewards.sum / config.training.solveWindow}%.1f"
-      println(s"\nEnvironment solved in $episodeCount episodes! (avg reward over last ${config.training.solveWindow}: $avg)")
+      println(
+        s"\nEnvironment solved in $episodeCount episodes! (avg reward over last ${config.training.solveWindow}: $avg)"
+      )
     else if episodeCount % config.training.logInterval == 0 then
       val avg = if recentRewards.nonEmpty then recentRewards.sum / recentRewards.size else 0.0
       val avgStr = f"$avg%.1f"
@@ -125,3 +93,39 @@ object ExperimentConfig:
 
   println(s"\nTest episode finished with total reward: $totalTestReward")
   Thread.sleep(config.render.testDisplayDurationMs)
+
+case class EpsilonDecayConfig(start: Double = 0.9, end: Double = 0.01, min: Double = 0.05)
+
+case class AgentConfig(
+    gamma: Double = 0.99,
+    learningRate: Double = 0.0005,
+    hiddenSize: Int = 64,
+    batchSize: Int = 64,
+    updateEach: Int = 1000,
+    memorySize: Int = 100000,
+    epsilonDecay: EpsilonDecayConfig = EpsilonDecayConfig()
+)
+
+case class TrainingConfig(
+    maxEpisodes: Int = 1500,
+    episodeMaxLength: Int = 200,
+    solveWindow: Int = 20,
+    solveThreshold: Double = 200.0,
+    logInterval: Int = 50
+)
+
+case class RenderConfig(
+    renderEach: Int = 200,
+    renderDelayMs: Long = 50L,
+    testDisplayDurationMs: Long = 2000L
+)
+
+case class ExperimentConfig(
+    training: TrainingConfig = TrainingConfig(),
+    agent: AgentConfig = AgentConfig(),
+    render: RenderConfig = RenderConfig(),
+    randomSeed: Long = 42
+)
+
+object ExperimentConfig:
+  val Default: ExperimentConfig = ExperimentConfig()
