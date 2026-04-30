@@ -14,6 +14,7 @@ object BoundedWorldTest:
 
   val numAgents = 6
   val boundSize = 10
+  val numActions = 5
   val trainingEpisodes = 1000
   val longTraining = 10000
   val testEpisodes = 10
@@ -41,11 +42,22 @@ object BoundedWorldTest:
   val simulator = Simulation(environment, render)
 
   @main def sharedQ(): Unit =
+    val learningRate = 0.2
+    val gamma = 0.95
+    val epsilonInitial = 0.9
+    val epsilonDecay = 0.003
+    val epsilonMin = 0.05
+
     val relativeStates = boundSize * boundSize
-    printSpaceInfo("sharedQ", relativeStates, 5)
+    printSpaceInfo("sharedQ", relativeStates, numActions)
     val same = Q.zeros[RelativeState, Action]
     val agents = environment.state.indices.map { i =>
-      val qAgent = QAgent(same, 0.2, 0.95, DecayReference.exponentialDecay(0.9, 0.003).bounded(0.05))
+      val qAgent = QAgent(
+        same,
+        learningRate,
+        gamma,
+        DecayReference.exponentialDecay(epsilonInitial, epsilonDecay).bounded(epsilonMin)
+      )
       RelativeStateAgent(qAgent, i, boundSize)
     }
     agents.foreach(_.trainingMode())
@@ -55,11 +67,22 @@ object BoundedWorldTest:
     simulator.simulate(testEpisodes, stepsPerEpisode, agents)
 
   @main def independentLearner(): Unit =
+    val learningRate = 0.2
+    val gamma = 0.95
+    val epsilonInitial = 0.9
+    val epsilonDecay = 0.0005
+    val epsilonMin = 0.05
+
     val relativeStates = boundSize * boundSize
-    printSpaceInfo("independentLearner", relativeStates, 5)
+    printSpaceInfo("independentLearner", relativeStates, numActions)
     val agents = environment.state.indices.map { i =>
       val qAgent =
-        QAgent(Q.zeros[RelativeState, Action], 0.2, 0.95, DecayReference.exponentialDecay(0.9, 0.0005).bounded(0.05))
+        QAgent(
+          Q.zeros[RelativeState, Action],
+          learningRate,
+          gamma,
+          DecayReference.exponentialDecay(epsilonInitial, epsilonDecay).bounded(epsilonMin)
+        )
       RelativeStateAgent(qAgent, i, boundSize)
     }
     agents.foreach(_.trainingMode())
@@ -69,11 +92,15 @@ object BoundedWorldTest:
     simulator.simulate(testEpisodes, stepsPerEpisode, agents)
 
   @main def centralController(): Unit =
+    val learningRate = 0.05
+    val gamma = 0.99
+    val epsilonMin = 0.05
+
     val absStates = math.pow(boundSize.toDouble, 2 * numAgents).toLong
-    val jointActions = math.pow(5, numAgents).toLong
+    val jointActions = math.pow(numActions.toDouble, numAgents).toLong
     printSpaceInfo("centralController", absStates, jointActions)
     val qTable = Q.zeros[State, Seq[Action]]
-    val centralAgent = QAgent(qTable, 0.05, 0.99, 0.05)
+    val centralAgent = QAgent(qTable, learningRate, gamma, epsilonMin)
     centralAgent.trainingMode()
     simulator.simulateCentralController(trainingEpisodes, stepsPerEpisode, centralAgent)
     centralAgent.testMode()
@@ -81,11 +108,26 @@ object BoundedWorldTest:
     simulator.simulateCentralController(testEpisodes, stepsPerEpisode, centralAgent)
 
   @main def deepQLearner(): Unit =
+    val learningRate = 0.01
+    val gamma = 0.99
+    val epsilonInitial = 0.9
+    val epsilonDecay = 0.01
+    val epsilonMin = 0.01
+    val batchSize = 32
+    val targetUpdateFreq = 64
+
     val relativeStates = boundSize * boundSize
-    printSpaceInfo("deepQLearner", relativeStates, 5)
+    printSpaceInfo("deepQLearner", relativeStates, numActions)
     val agents = environment.state.indices.map { i =>
       val memory: ReplayBuffer[RelativeState, Action] = ReplayBuffer.bounded(replayBufferSize)
-      val qAgent = DeepQAgent(memory, DecayReference.exponentialDecay(0.9, 0.01).bounded(0.01), 0.99, 0.05, 32, 64)
+      val qAgent = DeepQAgent(
+        memory,
+        DecayReference.exponentialDecay(epsilonInitial, epsilonDecay).bounded(epsilonMin),
+        gamma,
+        learningRate,
+        batchSize,
+        targetUpdateFreq
+      )
       RelativeStateAgent(qAgent, i, boundSize)
     }
     agents.foreach(_.trainingMode())
@@ -95,10 +137,25 @@ object BoundedWorldTest:
     simulator.simulate(testEpisodes, stepsPerEpisode, agents)
 
   @main def sharedDeepQLearner(): Unit =
+    val learningRate = 0.01
+    val gamma = 0.99
+    val epsilonInitial = 0.9
+    val epsilonDecay = 0.001
+    val epsilonMin = 0.01
+    val batchSize = 32
+    val targetUpdateFreq = 64
+
     val relativeStates = boundSize * boundSize
-    printSpaceInfo("sharedDeepQLearner", relativeStates, 5)
+    printSpaceInfo("sharedDeepQLearner", relativeStates, numActions)
     val memory: ReplayBuffer[RelativeState, Action] = ReplayBuffer.bounded(replayBufferSize)
-    val qLearner = DeepQAgent(memory, DecayReference.exponentialDecay(0.9, 0.001).bounded(0.01), 0.99, 0.005, 32, 64)
+    val qLearner = DeepQAgent(
+      memory,
+      DecayReference.exponentialDecay(epsilonInitial, epsilonDecay).bounded(epsilonMin),
+      gamma,
+      learningRate,
+      batchSize,
+      targetUpdateFreq
+    )
     val agents = environment.state.indices.map { i =>
       RelativeStateAgent(if i == 0 then qLearner else qLearner.slave(), i, boundSize)
     }
@@ -109,12 +166,21 @@ object BoundedWorldTest:
     simulator.simulate(testEpisodes, stepsPerEpisode, agents)
 
   @main def centralControllerDeep(): Unit =
+    val learningRate = 0.01
+    val gamma = 0.99
+    val epsilonInitial = 0.9
+    val epsilonDecay = 0.001
+    val epsilonMin = 0.05
+    val batchSize = 64
+    val targetUpdateFreq = 64
+    val hiddenSize = 64
+
     val absStates = math.pow(boundSize.toDouble, 2 * numAgents).toLong
-    val jointActions = math.pow(5, numAgents).toLong
+    val jointActions = math.pow(numActions.toDouble, numAgents).toLong
     printSpaceInfo("centralControllerDeep", absStates, jointActions)
     val memory: ReplayBuffer[State, Seq[Action]] = ReplayBuffer.bounded(replayBufferSize)
-    val epsilon = DecayReference.exponentialDecay(0.9, 0.001).bounded(0.05)
-    val learner = DeepQAgent(memory, epsilon, 0.99, 0.01, 64, 64)
+    val epsilon = DecayReference.exponentialDecay(epsilonInitial, epsilonDecay).bounded(epsilonMin)
+    val learner = DeepQAgent(memory, epsilon, gamma, learningRate, hiddenSize, targetUpdateFreq)
     learner.trainingMode()
     simulator.simulateCentralController(longTraining, stepsPerEpisode, learner)
     learner.testMode()
