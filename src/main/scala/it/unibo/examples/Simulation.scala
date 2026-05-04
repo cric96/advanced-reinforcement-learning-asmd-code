@@ -11,7 +11,13 @@ class Simulation[State, Action](using scheduler: Scheduler)(
     renderer: Render[State] = Render.empty[State]
 ):
   import environment.*
-  def simulate(episodes: Int, episodeLength: Int, agents: Seq[AI.Agent[State, Action]]): Unit =
+  def simulate(
+      episodes: Int,
+      episodeLength: Int,
+      agents: Seq[AI.Agent[State, Action]],
+      onEpisodeEnd: Seq[Double] => Unit = _ => (),
+      onStep: Seq[Double] => Unit = _ => ()
+  ): Unit =
     scheduler.reset()
     for episode <- 0 to episodes do
       agents.foreach(_.reset())
@@ -28,8 +34,10 @@ class Simulation[State, Action](using scheduler: Scheduler)(
         agents.zip(actionAndRewards).foreach { case (agent, (action, reward)) =>
           agent.record(currentState, action, reward, nextState)
         }
+        onStep(rewards)
         scheduler.tickStep()
       scheduler.tickEpisode()
+      onEpisodeEnd(totalRewards)
       println(s"Episode $episode, statistics: $totalRewards")
 
   def simulateCentralController(

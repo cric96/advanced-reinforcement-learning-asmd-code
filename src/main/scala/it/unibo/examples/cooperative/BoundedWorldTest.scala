@@ -12,7 +12,7 @@ import it.unibo.view.Render
 object BoundedWorldTest:
   import BoundedWorldEnvironment.*
 
-  val numAgents = 6
+  val numAgents = 2
   val boundSize = 10
   val numActions = 5
   val trainingEpisodes = 1000
