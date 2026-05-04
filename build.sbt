@@ -14,11 +14,3 @@ lazy val root = (project in file("."))
       "org.scalatest" %% "scalatest" % "3.2.14" % "test",
     ),
   )
-
-fork := true
-javaHome := Some(file("/usr/lib/jvm/java-25-openjdk"))
-javaOptions ++= Seq(
-  "-Xmx4G",
-  "-Djava.library.path=/usr/lib/x86_64-linux-gnu",
-  "--enable-native-access=ALL-UNNAMED"
-)
